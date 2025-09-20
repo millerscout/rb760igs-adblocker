@@ -1,0 +1,9 @@
+# Ensure adblock files always have Unix line endings (LF only)
+# This is critical for RouterOS compatibility
+adblock-*.txt text eol=lf
+*.rsc text eol=lf
+
+# Ensure binary files are not modified
+*.png binary
+*.jpg binary
+*.gif binary

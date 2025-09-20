@@ -25,9 +25,16 @@ jobs:
           # Convert to ASCII encoding
           iconv -f UTF-8 -t ASCII//IGNORE adblock-clean.txt > adblock-clean-ascii.txt
           mv adblock-clean-ascii.txt adblock-clean.txt
-          # Ensure Unix line endings (LF only) - use tr instead of dos2unix for better compatibility
+          # Ensure Unix line endings (LF only) - multiple methods for robustness
           tr -d '\r' < adblock-clean.txt > adblock-clean-unix.txt
           mv adblock-clean-unix.txt adblock-clean.txt
+          # Additional line ending cleanup with sed
+          sed -i 's/\r$//' adblock-clean.txt
+          # Verify no CRLF sequences remain
+          if hexdump -C adblock-clean.txt | head -20 | grep -q "0d 0a"; then
+            echo "ERROR: CRLF sequences still found in adblock-clean.txt"
+            exit 1
+          fi
 
       - name: Split into chunks of 10000 domains (for RouterOS)
         run: |
@@ -44,9 +51,16 @@ jobs:
           # Convert diff file to ASCII encoding
           iconv -f UTF-8 -t ASCII//IGNORE adblock-diff.txt > adblock-diff-ascii.txt
           mv adblock-diff-ascii.txt adblock-diff.txt
-          # Ensure Unix line endings (LF only) - use tr instead of dos2unix
+          # Ensure Unix line endings (LF only) - multiple methods for robustness
           tr -d '\r' < adblock-diff.txt > adblock-diff-unix.txt
           mv adblock-diff-unix.txt adblock-diff.txt
+          # Additional line ending cleanup with sed
+          sed -i 's/\r$//' adblock-diff.txt
+          # Verify no CRLF sequences remain
+          if hexdump -C adblock-diff.txt | head -20 | grep -q "0d 0a"; then
+            echo "ERROR: CRLF sequences still found in adblock-diff.txt"
+            exit 1
+          fi
           
       - name: Validate generated files
         run: |
