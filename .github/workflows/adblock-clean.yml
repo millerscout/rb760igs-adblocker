@@ -24,11 +24,11 @@ jobs:
         run: |
           split -l 10000 adblock-clean.txt adblock-chunk-
 
-      - name: List new domains (diff, max 10,000)
+      - name: List new domains (diff, max 4,000)
         run: |
           git fetch origin main
           git checkout origin/main -- adblock-clean.txt || touch adblock-clean.txt.old
-          comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) | head -n 10000 > adblock-diff.txt
+          comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) | head -n 4000 > adblock-diff.txt
 
       - name: Add & Commit cleaned blocklist and diff
         uses: EndBug/add-and-commit@v9
