@@ -19,16 +19,49 @@ jobs:
       - name: Clean hosts file (domain-only, no comments, no localhost, no IPv6)
         run: |
           grep '^0.0.0.0 ' hosts.txt | awk '{print $2}' | sort | uniq > adblock-clean.txt
+          
+      - name: Ensure ASCII encoding for RouterOS compatibility
+        run: |
+          # Convert to ASCII encoding and ensure Unix line endings
+          iconv -f UTF-8 -t ASCII//IGNORE adblock-clean.txt > adblock-clean-ascii.txt
+          mv adblock-clean-ascii.txt adblock-clean.txt
+          # Ensure Unix line endings (LF only)
+          dos2unix adblock-clean.txt || true
+          
+      - name: Ensure ASCII encoding for RouterOS compatibility
+        run: |
+          # Convert to ASCII encoding and ensure Unix line endings
+          iconv -f UTF-8 -t ASCII//IGNORE adblock-clean.txt > adblock-clean-ascii.txt
+          mv adblock-clean-ascii.txt adblock-clean.txt
+          # Ensure Unix line endings (LF only)
+          dos2unix adblock-clean.txt || true
 
       - name: Split into chunks of 10000 domains (for RouterOS)
         run: |
           split -l 10000 adblock-clean.txt adblock-chunk-
 
-      - name: List new domains (diff, max 4,000)
+      - name: List new domains (diff, max 10,000)
         run: |
           git fetch origin main
           git checkout origin/main -- adblock-clean.txt || touch adblock-clean.txt.old
-          comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) | head -n 4000 > adblock-diff.txt
+          comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) | head -n 10000 > adblock-diff.txt
+          
+      - name: Ensure diff file is ASCII encoded for RouterOS
+        run: |
+          # Convert diff file to ASCII encoding with Unix line endings
+          iconv -f UTF-8 -t ASCII//IGNORE adblock-diff.txt > adblock-diff-ascii.txt
+          mv adblock-diff-ascii.txt adblock-diff.txt
+          dos2unix adblock-diff.txt || true
+          
+      - name: Validate generated files
+        run: |
+          echo "=== File validation ==="
+          echo "adblock-clean.txt: $(wc -l < adblock-clean.txt) lines, $(wc -c < adblock-clean.txt) bytes"
+          echo "adblock-diff.txt: $(wc -l < adblock-diff.txt) lines, $(wc -c < adblock-diff.txt) bytes"
+          echo "First 5 lines of adblock-clean.txt:"
+          head -5 adblock-clean.txt
+          echo "First 5 lines of adblock-diff.txt:"
+          head -5 adblock-diff.txt
 
       - name: Add & Commit cleaned blocklist and diff
         uses: EndBug/add-and-commit@v9
