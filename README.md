@@ -1,12 +1,12 @@
-# RouterOS AdBlock for RB760iGS (hEX S)
+# RouterOS AdBlock for RB760iGS (hEX S) - Chunked Processing with State Tracking
 
-This repository provides RouterOS scripts to implement domain-based ad blocking on your RB760iGS router using address lists.
+This repository provides a RouterOS script to implement domain-based ad blocking on your RB760iGS router using address lists. The script uses a chunked file approach to overcome RouterOS memory limitations and includes state tracking for incremental updates.
 
 ## Quick Start
 
-### Recommended: Incremental Updates (Faster)
-1. **Upload the main script to your RouterOS device:**
-   - Download `router-scripts/script.rsc` (uses diff file - up to 10,000 new domains)
+### Setup AdBlock (One Script Does Everything)
+1. **Upload the script to your RouterOS device:**
+   - Download `router-scripts/script.rsc`
    - Upload via WinBox, WebFig, or SCP
 
 2. **Run the script:**
@@ -14,15 +14,16 @@ This repository provides RouterOS scripts to implement domain-based ad blocking 
    /import file-name=script.rsc
    ```
 
-### Alternative: Full Import (Complete but Slower)
-1. **For complete blocklist (all domains):**
-   - Download `router-scripts/adblock-full-import.rsc`
-   - Upload via WinBox, WebFig, or SCP
+3. **Subsequent runs are automatic and incremental:**
+   - Script saves state and only processes new chunks
+   - Much faster updates after the initial run
+   - Automatically detects if full refresh is needed
 
-2. **Run the full import:**
-   ```bash
-   /import file-name=adblock-full-import.rsc
-   ```
+### Force Full Refresh (Optional)
+1. **To force a complete refresh:**
+   - Upload `router-scripts/reset-state.rsc`
+   - Run: `/import file-name=reset-state.rsc`
+   - Then run the main script again
 
 ### Setup Firewall Rules (Required)
 3. **Set up firewall rules** (if not already configured):
@@ -36,24 +37,27 @@ This repository provides RouterOS scripts to implement domain-based ad blocking 
 - Runs twice monthly (1st and 15th)
 - Downloads latest StevenBlack hosts file
 - Extracts domains and converts to ASCII encoding for RouterOS compatibility
-- Generates two files:
-  - `adblock-clean.txt` - Full domain list (ASCII encoded)
-  - `adblock-diff.txt` - New domains only (max 10,000, ASCII encoded)
+- Generates chunked files:
+  - `adblock-chunk-1.txt`, `adblock-chunk-2.txt`, etc. - Small files with 500 domains each
+  - `adblock-chunks-count.txt` - Control file with total number of chunks
 
 ### RouterOS Script Features
+- **Chunked File Processing** - Downloads and processes small files sequentially to avoid memory limits
+- **Incremental State Tracking** - Saves progress and only processes new chunks on subsequent runs
 - **ASCII Encoding Support** - Compatible with RouterOS v7.19.3+
-- **Two Import Options:**
-  - **Incremental Updates** - Faster, processes only new domains (recommended)
-  - **Full Import** - Complete blocklist, slower but comprehensive
-- **Progress Logging** - Detailed status messages
-- **Error Handling** - Graceful failure management
-- **Automatic Cleanup** - Removes obsolete entries (incremental mode only)
+- **Memory Efficient** - Each chunk file is small enough to be read by RouterOS
+- **Smart Processing Modes:**
+  - **Full Mode** - First run or when chunk count decreases (complete refresh)
+  - **Incremental Mode** - Only processes new chunks (much faster)
+- **Progress Logging** - Detailed status messages for each chunk
+- **Error Handling** - Graceful failure management with chunk skipping
+- **Automatic Cleanup** - Removes obsolete entries and temporary files (full mode only)
 
 ## Files
 
 ### Main Scripts (Production Ready)
-- `router-scripts/script.rsc` - **Recommended:** Incremental import (diff file, up to 10,000 new domains)
-- `router-scripts/adblock-full-import.rsc` - Full import (complete blocklist, slower)
+- `router-scripts/script.rsc` - **Main Script:** Chunked processing with incremental state tracking
+- `router-scripts/reset-state.rsc` - **Utility:** Reset state to force full refresh
 
 ### Testing & Validation Scripts
 - `router-scripts/tests/sample-script.rsc` - Test script with 5 sample domains (good first test)
@@ -67,14 +71,14 @@ This repository provides RouterOS scripts to implement domain-based ad blocking 
 ### Sample Data
 - `router-scripts/tests/sample-test.txt` - Small test domain list
 
-## Script Comparison
+## Script Usage
 
-| Script | File Used | Domains | Speed | Use Case |
-|--------|-----------|---------|-------|----------|
-| `script.rsc` | `adblock-diff.txt` | Up to 10,000 new | ⚡ Fast | Regular updates |
-| `adblock-full-import.rsc` | `adblock-clean.txt` | All domains | 🐌 Slower | First setup or full refresh |
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| `script.rsc` | Main ad blocking script | Regular use - handles everything automatically |
+| `reset-state.rsc` | Force full refresh | Only when you want to completely rebuild the list |
 
-**Recommendation:** Use `script.rsc` for regular updates. Use `adblock-full-import.rsc` only for initial setup or when you want to completely refresh the blocklist.
+**Simple Process:** Just run `script.rsc` - it handles full setup on first run and incremental updates thereafter.
 
 ## Testing
 
@@ -101,12 +105,34 @@ If you encounter issues, use these diagnostic scripts:
 
 - **RouterOS Version:** v7.19.3+ (tested on RB760iGS)
 - **Memory Requirements:** 
-  - Incremental updates: ~1.5MB for 10,000 domains
-  - Full import: ~3-5MB for complete list
+  - Chunked processing: ~50KB per chunk (very low memory usage)
+  - State file: ~10 bytes (tracks last processed chunk count)
 - **Network:** Requires internet access for downloads
 - **Processing Time:**
-  - Incremental: 2-5 minutes
-  - Full import: 10-30 minutes (depending on list size)
+  - First run (full): 3-8 minutes (depends on number of chunks)
+  - Subsequent runs (incremental): 30 seconds - 2 minutes (only new chunks)
+
+## State Tracking Benefits
+
+**How it works:** The script saves a small state file (`adblock-state.txt`) containing the number of chunks last processed.
+
+**Benefits:**
+- **Incremental Updates:** Only downloads and processes new chunks
+- **Faster Updates:** Subsequent runs are much faster (only new domains)
+- **Automatic Detection:** Script determines if full refresh is needed
+- **Smart Recovery:** If chunk count decreases, automatically does full refresh
+
+**Example:**
+- First run: 50 chunks available → processes all 50 chunks (full mode)
+- Second run: 50 chunks available → no new chunks, exits early
+- Third run: 52 chunks available → processes only chunks 51-52 (incremental mode)
+- Fourth run: 48 chunks available → processes all 48 chunks (full mode, count decreased)
+
+## Memory Limitations Solved
+
+**Previous Issue:** RouterOS has undocumented memory limitations when reading large file contents (200KB+ files would return 0 characters).
+
+**Solution:** The chunked approach splits large domain lists into small files (500 domains each, ~5-15KB per file) that RouterOS can reliably read and process.
 
 ## Troubleshooting
 
@@ -138,13 +164,14 @@ If you encounter issues, use these diagnostic scripts:
 ```
 
 ### Common Issues:
-1. **"Content length: 0 characters"** - File encoding issue (should be fixed with ASCII encoding)
-2. **Download fails** - Check internet connectivity and DNS
-3. **Memory errors** - Router may need more available memory
+1. **"Control file not found"** - Check internet connectivity and GitHub access
+2. **Download fails** - Check internet connectivity and DNS  
+3. **Chunk skipped** - Non-critical, script continues with other chunks
+4. **"Already up to date"** - No new chunks available, working as expected
 
 ## Manual Setup
 
-If automatic download fails, you can manually upload `adblock-clean.txt` to your router and the script will use the local file.
+The script automatically downloads all needed files. No manual file uploads are required.
 
 ## License
 

@@ -36,15 +36,51 @@ jobs:
             exit 1
           fi
 
-      - name: Split into chunks of 10000 domains (for RouterOS)
+      - name: Split into chunks of 500 domains each (for RouterOS memory limits)
         run: |
-          split -l 10000 adblock-clean.txt adblock-chunk-
+          split -l 500 adblock-clean.txt adblock-chunk-
+          
+      - name: Create numbered chunk files for RouterOS processing  
+        run: |
+          # Convert split files to numbered format for easier processing
+          counter=1
+          for file in adblock-chunk-*; do
+            if [ -f "$file" ]; then
+              mv "$file" "adblock-chunk-$(printf "%03d" $counter).txt"
+              counter=$((counter + 1))
+            fi
+          done
+          
+          # Create control file with chunk count
+          chunk_count=$((counter - 1))
+          echo $chunk_count > adblock-chunks-count.txt
+          echo "Created $chunk_count chunk files"
 
-      - name: List new domains (diff, max 10,000)
+      - name: List new domains (diff) and split into numbered chunks
         run: |
           git fetch origin main
           git checkout origin/main -- adblock-clean.txt || touch adblock-clean.txt.old
-          comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) | head -n 10000 > adblock-diff.txt
+          comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) > adblock-diff-full.txt
+          
+          # Split diff into chunks of 500 domains each
+          split -l 500 adblock-diff-full.txt adblock-diff-chunk-
+          
+          # Convert to numbered format
+          counter=1
+          for file in adblock-diff-chunk-*; do
+            if [ -f "$file" ]; then
+              mv "$file" "adblock-diff-$(printf "%03d" $counter).txt"
+              counter=$((counter + 1))
+            fi
+          done
+          
+          # Create diff control file
+          diff_chunk_count=$((counter - 1))
+          echo $diff_chunk_count > adblock-diff-count.txt
+          echo "Created $diff_chunk_count diff chunk files"
+          
+          # Also create a simple single diff file for backward compatibility (max 500 domains)
+          head -n 500 adblock-diff-full.txt > adblock-diff.txt
           
       - name: Ensure diff file is ASCII encoded with Unix line endings for RouterOS
         run: |
@@ -104,20 +140,26 @@ jobs:
           echo "First 5 lines of adblock-diff.txt:"
           head -5 adblock-diff.txt
 
-      - name: Add & Commit cleaned blocklist and diff
+      - name: Add & Commit cleaned blocklist, chunks, and control files
         uses: EndBug/add-and-commit@v9
         with:
           author_name: github-actions
           author_email: github-actions@github.com
-          message: "Update cleaned adblock list and diff"
+          message: "Update cleaned adblock list with numbered chunks"
           add: |
             adblock-clean.txt
             adblock-diff.txt
+            adblock-diff-count.txt
+            adblock-diff-*.txt
+            adblock-chunks-count.txt
+            adblock-chunk-*.txt
 
-      - name: Upload cleaned blocklist and diff as artifact
+      - name: Upload all adblock files as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: adblock-clean
+          name: adblock-clean-chunks
           path: |
             adblock-clean.txt
-            adblock-diff.txt
+            adblock-diff*.txt
+            adblock-chunk*.txt
+            *-count.txt
