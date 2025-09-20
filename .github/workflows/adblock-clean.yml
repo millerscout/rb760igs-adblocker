@@ -20,21 +20,14 @@ jobs:
         run: |
           grep '^0.0.0.0 ' hosts.txt | awk '{print $2}' | sort | uniq > adblock-clean.txt
           
-      - name: Ensure ASCII encoding for RouterOS compatibility
+      - name: Ensure ASCII encoding and Unix line endings for RouterOS compatibility
         run: |
-          # Convert to ASCII encoding and ensure Unix line endings
+          # Convert to ASCII encoding
           iconv -f UTF-8 -t ASCII//IGNORE adblock-clean.txt > adblock-clean-ascii.txt
           mv adblock-clean-ascii.txt adblock-clean.txt
-          # Ensure Unix line endings (LF only)
-          dos2unix adblock-clean.txt || true
-          
-      - name: Ensure ASCII encoding for RouterOS compatibility
-        run: |
-          # Convert to ASCII encoding and ensure Unix line endings
-          iconv -f UTF-8 -t ASCII//IGNORE adblock-clean.txt > adblock-clean-ascii.txt
-          mv adblock-clean-ascii.txt adblock-clean.txt
-          # Ensure Unix line endings (LF only)
-          dos2unix adblock-clean.txt || true
+          # Ensure Unix line endings (LF only) - use tr instead of dos2unix for better compatibility
+          tr -d '\r' < adblock-clean.txt > adblock-clean-unix.txt
+          mv adblock-clean-unix.txt adblock-clean.txt
 
       - name: Split into chunks of 10000 domains (for RouterOS)
         run: |
@@ -46,18 +39,52 @@ jobs:
           git checkout origin/main -- adblock-clean.txt || touch adblock-clean.txt.old
           comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) | head -n 10000 > adblock-diff.txt
           
-      - name: Ensure diff file is ASCII encoded for RouterOS
+      - name: Ensure diff file is ASCII encoded with Unix line endings for RouterOS
         run: |
-          # Convert diff file to ASCII encoding with Unix line endings
+          # Convert diff file to ASCII encoding
           iconv -f UTF-8 -t ASCII//IGNORE adblock-diff.txt > adblock-diff-ascii.txt
           mv adblock-diff-ascii.txt adblock-diff.txt
-          dos2unix adblock-diff.txt || true
+          # Ensure Unix line endings (LF only) - use tr instead of dos2unix
+          tr -d '\r' < adblock-diff.txt > adblock-diff-unix.txt
+          mv adblock-diff-unix.txt adblock-diff.txt
           
       - name: Validate generated files
         run: |
           echo "=== File validation ==="
           echo "adblock-clean.txt: $(wc -l < adblock-clean.txt) lines, $(wc -c < adblock-clean.txt) bytes"
           echo "adblock-diff.txt: $(wc -l < adblock-diff.txt) lines, $(wc -c < adblock-diff.txt) bytes"
+          
+          # Check line endings (should be Unix LF only, no CRLF)
+          echo "=== Line ending validation ==="
+          if file adblock-clean.txt | grep -q "CRLF"; then
+            echo "ERROR: adblock-clean.txt has Windows line endings (CRLF)"
+            exit 1
+          else
+            echo "✓ adblock-clean.txt has Unix line endings (LF)"
+          fi
+          
+          if file adblock-diff.txt | grep -q "CRLF"; then
+            echo "ERROR: adblock-diff.txt has Windows line endings (CRLF)"
+            exit 1
+          else
+            echo "✓ adblock-diff.txt has Unix line endings (LF)"
+          fi
+          
+          # Check for carriage returns manually
+          if hexdump -C adblock-clean.txt | grep -q "0d 0a"; then
+            echo "ERROR: adblock-clean.txt contains CRLF sequences (0D 0A)"
+            exit 1
+          else
+            echo "✓ adblock-clean.txt contains no CRLF sequences"
+          fi
+          
+          if hexdump -C adblock-diff.txt | grep -q "0d 0a"; then
+            echo "ERROR: adblock-diff.txt contains CRLF sequences (0D 0A)"
+            exit 1
+          else
+            echo "✓ adblock-diff.txt contains no CRLF sequences"
+          fi
+          
           echo "First 5 lines of adblock-clean.txt:"
           head -5 adblock-clean.txt
           echo "First 5 lines of adblock-diff.txt:"

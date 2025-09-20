@@ -45,8 +45,8 @@
     /tool fetch url=$fileUrl dst-path=$fileName
     :log info "AdBlock: File download completed"
     
-    # Wait a moment for file system to sync
-    :delay 1
+    # Wait longer for file system to sync
+    :delay 2
     
     # Check if file exists after download
     :if ([:len [/file find name=$fileName]] = 0) do={
@@ -54,19 +54,30 @@
         :error "File not found after download"
     }
     
-        :local fileId [/file find name=$fileName]
-        :local fileSize [/file get $fileId size]
-        :log info ("AdBlock: Downloaded file size: " . $fileSize . " bytes")    :if ($fileSize = 0) do={
+    :local fileId [/file find name=$fileName]
+    :local fileSize [/file get $fileId size]
+    :log info ("AdBlock: Downloaded file size: " . $fileSize . " bytes")
+    
+    :if ($fileSize = 0) do={
         :log error "AdBlock: Downloaded file is empty - trying alternative URL"
         
         # Try alternative URL with different format
         :local altUrl "https://raw.githubusercontent.com/millerscout/rb760igs-adblocker/main/adblock-clean.txt"
         :log info ("AdBlock: Trying alternative URL: " . $altUrl)
         
-        /tool fetch url=$altUrl dst-path=$fileName
+        # Remove the empty file first
+        /file remove $fileName
         :delay 1
         
+        /tool fetch url=$altUrl dst-path=$fileName
+        :delay 2
+        
         :set fileId [/file find name=$fileName]
+        :if ([:len $fileId] = 0) do={
+            :log error "AdBlock: Alternative file not found after download"
+            :error "Alternative download failed"
+        }
+        
         :set fileSize [/file get $fileId size]
         :log info ("AdBlock: Alternative file size: " . $fileSize . " bytes")
         
@@ -97,7 +108,15 @@
 
 # Read file into array and show sample content
 :do {
+    # Wait for file system to fully sync
+    :delay 1
+    
     :local fileId [/file find name=$fileName]
+    :if ([:len $fileId] = 0) do={
+        :log error "AdBlock: File not found for reading"
+        :error "File not found"
+    }
+    
     :local fileContent [/file get $fileId contents]
     :local start 0
     :local end 0
@@ -106,10 +125,11 @@
     :local enabledDomains 0
     :local addedDomains 0
 
-    :log info ("AdBlock: Processing file content (" . $len . " characters)")
+    :log info ("AdBlock: Content successfully read: " . $len . " characters")
 
     :if ($len = 0) do={
         :log error "AdBlock: File content is empty - cannot proceed"
+        :log info "AdBlock: File exists but contains no data"
         :error "Empty file content"
     }
 
