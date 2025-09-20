@@ -17,7 +17,6 @@ This repository provides a RouterOS script to implement domain-based ad blocking
 3. **Subsequent runs are automatic and incremental:**
    - Script saves state and only processes new chunks
    - Much faster updates after the initial run
-   - Automatically detects if full refresh is needed
 
 ### Force Full Refresh (Optional)
 1. **To force a complete refresh:**
@@ -46,9 +45,6 @@ This repository provides a RouterOS script to implement domain-based ad blocking
 - **Incremental State Tracking** - Saves progress and only processes new chunks on subsequent runs. If interrupted, the script resumes from the last successfully processed chunk.
 - **ASCII Encoding Support** - Compatible with RouterOS v7.19.3+
 - **Memory Efficient** - Each chunk file is small enough to be read by RouterOS
-- **Smart Processing Modes:**
-  - **Full Mode** - First run or when chunk count decreases (complete refresh)
-  - **Incremental Mode** - Only processes new chunks (much faster)
 - **Configurable Logging** - Enable or disable detailed status messages by setting a variable in the script (`enableLogs`).
 - **Error Handling** - Graceful failure management with chunk skipping
 - **Automatic Cleanup** - Removes obsolete entries and temporary files (full mode only)
@@ -108,31 +104,6 @@ If you encounter issues, use these diagnostic scripts:
   - Chunked processing: ~50KB per chunk (very low memory usage)
   - State file: ~10 bytes (tracks last processed chunk count)
 - **Network:** Requires internet access for downloads
-- **Processing Time:**
-  - First run (full): 3-8 minutes (depends on number of chunks)
-  - Subsequent runs (incremental): 30 seconds - 2 minutes (only new chunks)
-
-## State Tracking Benefits
-
-**How it works:** The script saves a small state file (`adblock-state.txt`) containing the number of chunks last processed.
-
-**Benefits:**
-- **Incremental Updates:** Only downloads and processes new chunks
-- **Faster Updates:** Subsequent runs are much faster (only new domains)
-- **Automatic Detection:** Script determines if full refresh is needed
-- **Smart Recovery:** If chunk count decreases, automatically does full refresh
-
-**Example:**
-- First run: 50 chunks available → processes all 50 chunks (full mode)
-- Second run: 50 chunks available → no new chunks, exits early
-- Third run: 52 chunks available → processes only chunks 51-52 (incremental mode)
-- Fourth run: 48 chunks available → processes all 48 chunks (full mode, count decreased)
-
-## Memory Limitations Solved
-
-**Previous Issue:** RouterOS has undocumented memory limitations when reading large file contents (200KB+ files would return 0 characters).
-
-**Solution:** The chunked approach splits large domain lists into small files (500 domains each, ~5-15KB per file) that RouterOS can reliably read and process.
 
 ## Troubleshooting
 
