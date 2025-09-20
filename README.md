@@ -43,13 +43,13 @@ This repository provides a RouterOS script to implement domain-based ad blocking
 
 ### RouterOS Script Features
 - **Chunked File Processing** - Downloads and processes small files sequentially to avoid memory limits
-- **Incremental State Tracking** - Saves progress and only processes new chunks on subsequent runs
+- **Incremental State Tracking** - Saves progress and only processes new chunks on subsequent runs. If interrupted, the script resumes from the last successfully processed chunk.
 - **ASCII Encoding Support** - Compatible with RouterOS v7.19.3+
 - **Memory Efficient** - Each chunk file is small enough to be read by RouterOS
 - **Smart Processing Modes:**
   - **Full Mode** - First run or when chunk count decreases (complete refresh)
   - **Incremental Mode** - Only processes new chunks (much faster)
-- **Progress Logging** - Detailed status messages for each chunk
+- **Configurable Logging** - Enable or disable detailed status messages by setting a variable in the script (`enableLogs`).
 - **Error Handling** - Graceful failure management with chunk skipping
 - **Automatic Cleanup** - Removes obsolete entries and temporary files (full mode only)
 
