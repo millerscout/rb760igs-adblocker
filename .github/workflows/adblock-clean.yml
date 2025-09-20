@@ -1,0 +1,49 @@
+name: AdBlock Clean Generator
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 1,15 * *'
+
+jobs:
+  clean-adblock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download StevenBlack hosts file
+        run: |
+          curl -L https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts -o hosts.txt
+
+      - name: Clean hosts file (domain-only, no comments, no localhost, no IPv6)
+        run: |
+          grep '^0.0.0.0 ' hosts.txt | awk '{print $2}' | sort | uniq > adblock-clean.txt
+
+      - name: Split into chunks of 10000 domains (for RouterOS)
+        run: |
+          split -l 10000 adblock-clean.txt adblock-chunk-
+
+      - name: List new domains (diff, max 10,000)
+        run: |
+          git fetch origin main
+          git checkout origin/main -- adblock-clean.txt || touch adblock-clean.txt.old
+          comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) | head -n 10000 > adblock-diff.txt
+
+      - name: Commit cleaned blocklist and diff
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add adblock-clean.txt adblock-diff.txt
+          git commit -m "Update cleaned adblock list and diff"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload cleaned blocklist and diff as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: adblock-clean
+          path: |
+            adblock-clean.txt
+            adblock-diff.txt
