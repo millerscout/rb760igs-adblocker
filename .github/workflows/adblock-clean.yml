@@ -30,15 +30,15 @@ jobs:
           git checkout origin/main -- adblock-clean.txt || touch adblock-clean.txt.old
           comm -13 <(sort adblock-clean.txt.old) <(sort adblock-clean.txt) | head -n 10000 > adblock-diff.txt
 
-      - name: Commit cleaned blocklist and diff
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add adblock-clean.txt adblock-diff.txt
-          git commit -m "Update cleaned adblock list and diff"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add & Commit cleaned blocklist and diff
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: github-actions
+          author_email: github-actions@github.com
+          message: "Update cleaned adblock list and diff"
+          add: |
+            adblock-clean.txt
+            adblock-diff.txt
 
       - name: Upload cleaned blocklist and diff as artifact
         uses: actions/upload-artifact@v4
